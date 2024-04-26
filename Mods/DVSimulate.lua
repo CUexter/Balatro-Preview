@@ -36,7 +36,8 @@ DV.SIM = {
 
    misc = {
       --- Table to store ancillary status variables:
-      next_stone_id = -1
+      next_stone_id = -1,
+      yorick_tallied = false
    }
 }
 
@@ -840,7 +841,7 @@ DV.SIM.JOKERS = {
    simulate_vampire = function(joker_obj, context)
       if context.cardarea == G.jokers and context.before and not context.blueprint then
          local num_enhanced = 0
-         for _, card in ipairs(context.scoring_hand) do
+         for _, card in ipairs(context.full_hand) do
             if card.ability.name ~= "Default Base" and not card.debuff then
                num_enhanced = num_enhanced + 1
                DV.SIM.set_ability(card, G.P_CENTERS.c_base)
@@ -894,7 +895,7 @@ DV.SIM.JOKERS = {
    end,
    simulate_midas_mask = function(joker_obj, context)
       if context.cardarea == G.jokers and context.before and not context.blueprint then
-         for _, card in ipairs(context.scoring_hand) do
+         for _, card in ipairs(context.full_hand) do
             if DV.SIM.is_face(card) then
                DV.SIM.set_ability(card, G.P_CENTERS.m_gold)
             end
@@ -1103,7 +1104,7 @@ DV.SIM.JOKERS = {
    simulate_sock_and_buskin = function(joker_obj, context)
       if context.cardarea == G.play and context.repetition then
          if DV.SIM.is_face(context.other_card) and not context.other_card.debuff then
-            DV.SIM.add_reps(joker_obj.ability.extra)
+            DV.SIM.add_reps(1)
          end
       end
    end,
@@ -1127,7 +1128,7 @@ DV.SIM.JOKERS = {
    simulate_hanging_chad = function(joker_obj, context)
       if context.cardarea == G.play and context.repetition then
          if context.other_card == context.scoring_hand[1] and not context.other_card.debuff then
-            DV.SIM.add_reps(joker_obj.ability.extra)
+            DV.SIM.add_reps(1)
          end
       end
    end,
@@ -1182,10 +1183,10 @@ DV.SIM.JOKERS = {
          -- Account for all 'real' suits:
          for _, card in ipairs(context.scoring_hand) do
             if card.ability.effect ~= "Wild Card" then
-               if     DV.SIM.is_suit(card, "Hearts", true)   and suit_count["Hearts"] == 0   then inc_suit("Hearts")
-               elseif DV.SIM.is_suit(card, "Diamonds", true) and suit_count["Diamonds"] == 0 then inc_suit("Diamonds")
-               elseif DV.SIM.is_suit(card, "Spades", true)   and suit_count["Spades"] == 0   then inc_suit("Spades")
-               elseif DV.SIM.is_suit(card, "Clubs", true)    and suit_count["Clubs"] == 0    then inc_suit("Clubs")
+               if     DV.SIM.is_suit(card, "Hearts")   and suit_count["Hearts"] == 0   then inc_suit("Hearts")
+               elseif DV.SIM.is_suit(card, "Diamonds") and suit_count["Diamonds"] == 0 then inc_suit("Diamonds")
+               elseif DV.SIM.is_suit(card, "Spades")   and suit_count["Spades"] == 0   then inc_suit("Spades")
+               elseif DV.SIM.is_suit(card, "Clubs")    and suit_count["Clubs"] == 0    then inc_suit("Clubs")
                end
             end
          end
@@ -1384,15 +1385,17 @@ DV.SIM.JOKERS = {
    simulate_yorick = function(joker_obj, context)
       if context.cardarea == G.hand and context.discard and not context.blueprint then
          -- This is only necessary for 'The Hook' blind.
-         if joker_obj.ability.yorick_discards > 1 then
-            joker_obj.ability.yorick_discards = joker_obj.ability.yorick_discards - 1
-         else
-            joker_obj.ability.yorick_discards = joker_obj.ability.extra.discards
-            joker_obj.ability.x_mult = joker_obj.ability.x_mult + joker_obj.ability.extra.xmult
+         -- Must ensure Yorick only subtracts one discard for both discarded cards.
+         if DV.SIM.misc.yorick_tallied then return end
+         DV.SIM.misc.yorick_tallied = true
+
+         joker_obj.ability.yorick_discards = joker_obj.ability.yorick_discards - 1
+      end
+      if context.cardarea == G.jokers and context.global then
+         if joker_obj.ability.yorick_discards <= 0 then
+            DV.SIM.x_mult(joker_obj.ability.extra.xmult)
          end
       end
-
-      DV.SIM.JOKERS.x_mult_if_global(joker_obj, context)
    end,
    simulate_chicot = function(joker_obj, context)
       -- Effect not relevant (Meta)
